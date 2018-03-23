@@ -1,0 +1,245 @@
+<!doctype html>
+<html>
+  <head>
+    <script src="lib/Pizzicato.min.js"></script>
+    <script src="lib/blotter.min.js"></script>
+    <script src="lib/channelSplitMaterial.js"></script>
+    <script src="lib/audio.js"></script>
+    <style>
+      body, html {
+        height: 100%;
+      }
+
+      body {
+        font-family: "Lucida Console", Monaco, monospace;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        overflow: hidden;
+        margin: 0;
+      }
+
+      canvas {
+        position: relative;
+        will-change: transform; 
+        z-index: 1;
+      }
+
+      #container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        height: 100%;
+        perspective: 100em;
+        position: relative;
+        z-index: 3;
+        transform-style: preserve-3d;
+      }
+
+      .gif {
+        position: absolute;
+        left: 0;
+        top: 0;
+        will-change: transform; 
+        transform-style: preserve-3d;
+      }
+
+      #credits {
+        font-size: 12px;
+        position: fixed;
+        bottom: 50px;
+        right: 20px;
+        z-index: 2;
+        background: #000;
+        padding: 10px;
+        color: #FFF;
+      }
+
+      #credits a {
+        color: #FFF;
+        text-shadow: 0 0 5px rgba(0,0,0,0.8);
+      }
+
+      #spiral {
+        z-index: 0;
+        position: fixed;
+        background-image: url(./images/bg.gif);
+        background-size: cover;
+        background-position: center 50%;
+        left: 0;
+        top: 0;
+        right: 0;
+        bottom: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="container"></div>
+    <div id="credits">
+      <a href="https://twitter.com/mrzmyr" target="_blank">music & code @mrzmyr</a>; 
+      <a target="_blank" href="//giphy.com/search/trippy">gifs by giphy</a>
+      <span id="battery"></span>
+    </div>
+    <div id="spiral"></div>
+    <script>
+      const GIPHY_API_KEY = 'UwJXvibEPkh2WHdOVPHEBXZ4bifIc6dP';
+      const GIPHY_ROOT = 'http://api.giphy.com/v1';
+      const GIPHY_SEARCH_URI = '/gifs/search';
+
+      const spiralElement = document.getElementById('spiral');
+      const batteryElement = document.getElementById('battery')
+      const containerElement = document.getElementById('container')
+
+      function sum(args) {
+        return args.reduce((a,b) => a + b)
+      }
+
+      function random(min, max) {
+          return Math.floor(Math.random() * (max - min + 1)) + min;
+      }
+
+      function debounce(fn, threshold, scope) {
+        threshold || (threshold = 250);
+        var last, deferTimer;
+        
+        return function() {
+          var context = scope || this;
+          var now = +new Date, args = arguments;
+          
+          if (last && now < last + threshold) {
+            // Hold on to it
+            clearTimeout(deferTimer);
+            deferTimer = setTimeout(function() {
+              last = now;
+              fn.apply(context, args);
+            }, threshold);
+          } else {
+            last = now;
+            fn.apply(context, args);
+          }
+        };
+      };
+
+      let tracks = []
+
+      const MP3_PATH = './audio/808.mp3'
+
+      async function loadTracks() {
+
+        tracks[0] = new Sound(MP3_PATH);
+        await tracks[0].load()
+        tracks[0].addEffect(new Pizzicato.Effects.LowPassFilter({
+          frequency: 600,
+          peak: 10
+        }))
+        tracks[0].addEffect(new Pizzicato.Effects.HighPassFilter({
+          frequency: 4000,
+          peak: 10
+        }))
+
+        tracks[1] = new Sound(MP3_PATH);
+        await tracks[1].load()
+        tracks[1].addEffect(new Pizzicato.Effects.HighPassFilter({
+          frequency: 2000,
+          peak: 10
+        }))
+
+        tracks[2] = new Sound(MP3_PATH);
+        await tracks[2].load()
+        tracks[2].addEffect(new Pizzicato.Effects.LowPassFilter({
+          frequency: 400,
+          peak: 10
+        }))
+
+        tracks[3] = new Sound(MP3_PATH);
+        await tracks[3].load()
+
+        tracks.map(t => t.play())
+      }
+
+      var text = new Blotter.Text(`ಠᴗಠ`, {
+        family : "Arial",
+        size : 100,
+        paddingTop: 100,
+        paddingBottom: 100,
+        paddingLeft: 100,
+        paddingRight: 100,
+      });
+
+      function normalize(v, min, max) {
+        return ((v - min) / max - min)
+      }
+
+      function rearrangeGifs(gifs) {
+        debounce(() => {
+          gifs.map(img => { 
+            if(random([0,0,0,0,0,0,1]) == 1) return;
+            img.style.setProperty('transform', `translate3d(${random(0, window.innerWidth)}px, ${random(0, window.innerHeight)}px, 0) scale(${random(1,1.5)}) rotateY(${random(0,360)}deg)`)
+          })
+        }, 1000)()
+      }
+
+      (async () => {
+        await loadTracks()
+
+        const material = new Blotter.ChannelSplitMaterial();
+        const blotter = new Blotter(material, { texts : text });
+
+        const scope = blotter.forText(text)
+        scope.appendTo(containerElement);
+
+        const query = 'trippy';
+        const gifResults = await fetch(`${GIPHY_ROOT}${GIPHY_SEARCH_URI}?q=${query}&api_key=${GIPHY_API_KEY}`)
+          .then(resp => resp.json())
+
+        const gifElements = gifResults.data.map(gif => {
+          let img = document.createElement('img');
+          img.src = gif.images.downsized.url;
+          img.classList.add('gif');
+          img.width = 100;
+          img.height = 100 * gif.images.downsized.height / gif.images.downsized.width;
+          img.style.setProperty('transform', `translate3d(${random(0, window.innerWidth)}px, ${random(0, window.innerHeight)}px, 0) scale(${random(1,2)})`)
+          img.style.setProperty('filter', `invert(${random([0, 1, 0])})`)
+          containerElement.appendChild(img);
+          return img;
+        })
+
+        let lastSums1 = [];
+        let lastSums2 = [];
+
+        requestAnimationFrame(async function update(timestamp) {
+          let sum1 = tracks[0].getByteFrequencyData().reduce((a,b) => a+b);
+          let sum2 = tracks[1].getByteFrequencyData().reduce((a,b) => a+b);
+
+          lastSums1.push(sum1)
+          lastSums2.push(sum2)
+
+          let offset1 = (sum1 - Math.min(...lastSums1)) / Math.max(...lastSums1);
+          let offset2 = (sum2 - Math.min(...lastSums2)) / Math.max(...lastSums2) / 4;
+
+          if(offset2 > 0.15) {
+            scope.domElement.style.setProperty('transform', `translate3d(${random(0, window.innerWidth/3)}px, ${offset2*200 - 100}px, 0) scale(${random(1,3)})`)
+          }
+
+          if(offset1 > 0.4) {
+            rearrangeGifs(gifElements)
+          }
+
+          if(offset2 > 0.15) {
+            scope.domElement.style.setProperty('filter', `invert(${random([0, 1, 0])})`)
+            spiralElement.style.setProperty('filter', `invert(${random(0,1)})`)
+          }
+
+          const batteryLevel = await navigator.getBattery();
+          batteryElement.innerText = `${parseInt(batteryLevel.level*100)}% battery`
+
+          material.uniforms.uRotation.value = offset1 * 360;
+          material.uniforms.uOffset.value = offset2 / 5;
+
+          requestAnimationFrame(update);
+        })
+      })()
+    </script>
+  </body>
+</html>
