@@ -6,6 +6,11 @@
     <script src="lib/channelSplitMaterial.js"></script>
     <script src="lib/audio.js"></script>
     <style>
+      * {
+      user-select: none;
+      -moz-user-select: none;
+    }
+
       body, html {
         height: 100%;
       }
@@ -231,8 +236,10 @@
             spiralElement.style.setProperty('filter', `invert(${random(0,1)})`)
           }
 
-          const batteryLevel = await navigator.getBattery();
-          batteryElement.innerText = `${parseInt(batteryLevel.level*100)}% battery`
+          if(navigator.getBattery) {
+            const batteryLevel = await navigator.getBattery();
+            batteryElement.innerText = `${parseInt(batteryLevel.level*100)}% battery`
+          }
 
           material.uniforms.uRotation.value = offset1 * 360;
           material.uniforms.uOffset.value = offset2 / 5;
