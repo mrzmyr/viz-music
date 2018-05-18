@@ -7,9 +7,9 @@
     <script src="lib/audio.js"></script>
     <style>
       * {
-      user-select: none;
-      -moz-user-select: none;
-    }
+        user-select: none;
+        -moz-user-select: none;
+      }
 
       body, html {
         height: 100%;
@@ -76,7 +76,33 @@
         top: 0;
         right: 0;
         bottom: 0;
+        display: none;
       }
+
+      #start {
+        background: #000;
+        font-weight: bold;
+        color: #FFF;
+        position: absolute;
+        left: 0;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        border: 0;
+        z-index: 4;
+        width: 100%;
+        cursor: pointer;
+        font-size: 120px;
+        font-family: Impact, Charcoal, sans-serif;
+        cursor: progress;
+      }
+
+      #start:not([disabled]):hover {
+        cursor: pointer;
+        background: #FFF;
+        color: #000;
+      }
+
     </style>
   </head>
   <body>
@@ -86,15 +112,21 @@
       <a target="_blank" href="//giphy.com/search/trippy">gifs by giphy</a>
       <span id="battery"></span>
     </div>
+    <button id="start" disabled>Loading…</button>
     <div id="spiral"></div>
     <script>
       const GIPHY_API_KEY = 'UwJXvibEPkh2WHdOVPHEBXZ4bifIc6dP';
       const GIPHY_ROOT = 'https://api.giphy.com/v1';
       const GIPHY_SEARCH_URI = '/gifs/search';
 
+      const startBtn = document.getElementById('start');
       const spiralElement = document.getElementById('spiral');
       const batteryElement = document.getElementById('battery')
       const containerElement = document.getElementById('container')
+
+      const MP3_PATH = './audio/808.mp3'
+
+      let tracks = []
 
       function sum(args) {
         return args.reduce((a,b) => a + b)
@@ -126,43 +158,6 @@
         };
       };
 
-      let tracks = []
-
-      const MP3_PATH = './audio/808.mp3'
-
-      async function loadTracks() {
-
-        tracks[0] = new Sound(MP3_PATH);
-        await tracks[0].load()
-        tracks[0].addEffect(new Pizzicato.Effects.LowPassFilter({
-          frequency: 600,
-          peak: 10
-        }))
-        tracks[0].addEffect(new Pizzicato.Effects.HighPassFilter({
-          frequency: 4000,
-          peak: 10
-        }))
-
-        tracks[1] = new Sound(MP3_PATH);
-        await tracks[1].load()
-        tracks[1].addEffect(new Pizzicato.Effects.HighPassFilter({
-          frequency: 2000,
-          peak: 10
-        }))
-
-        tracks[2] = new Sound(MP3_PATH);
-        await tracks[2].load()
-        tracks[2].addEffect(new Pizzicato.Effects.LowPassFilter({
-          frequency: 400,
-          peak: 10
-        }))
-
-        tracks[3] = new Sound(MP3_PATH);
-        await tracks[3].load()
-
-        tracks.map(t => t.play())
-      }
-
       var text = new Blotter.Text(`ಠᴗಠ`, {
         family : "Arial",
         size : 100,
@@ -185,68 +180,94 @@
         }, 1000)()
       }
 
-      (async () => {
-        await loadTracks()
+      window.onload = async function() {
 
-        const material = new Blotter.ChannelSplitMaterial();
-        const blotter = new Blotter(material, { texts : text });
-
-        const scope = blotter.forText(text)
-        scope.appendTo(containerElement);
-
-        const query = 'trippy';
-        const gifResults = await fetch(`${GIPHY_ROOT}${GIPHY_SEARCH_URI}?q=${query}&api_key=${GIPHY_API_KEY}`)
-          .then(resp => resp.json())
-
-        const gifElements = gifResults.data.map(gif => {
-          let img = document.createElement('img');
-          img.src = gif.images.downsized.url;
-          img.classList.add('gif');
-          img.width = 100;
-          img.height = 100 * gif.images.downsized.height / gif.images.downsized.width;
-          img.style.setProperty('transform', `translate3d(${random(0, window.innerWidth)}px, ${random(0, window.innerHeight)}px, 0) scale(${random(1,2)})`)
-          img.style.setProperty('filter', `invert(${random([0, 1, 0])})`)
-          containerElement.appendChild(img);
-          return img;
+        tracks[0] = new Sound(MP3_PATH);
+        tracks[1] = new Sound(MP3_PATH);
+        tracks[2] = new Sound(MP3_PATH);
+        tracks[3] = new Sound(MP3_PATH);
+        
+        await Promise.all(tracks.map(t => t.load())).then(result => {
+          startBtn.innerText = 'Play.';
+          startBtn.disabled = false;
         })
 
-        let lastSums1 = [];
-        let lastSums2 = [];
+        tracks[0].addEffect(new Pizzicato.Effects.LowPassFilter({ frequency: 600, peak: 10 }))
+        tracks[0].addEffect(new Pizzicato.Effects.HighPassFilter({ frequency: 4000, peak: 10 }))
+        tracks[1].addEffect(new Pizzicato.Effects.HighPassFilter({ frequency: 2000, peak: 10 }))
+        tracks[2].addEffect(new Pizzicato.Effects.LowPassFilter({ frequency: 400, peak: 10 }))
 
-        requestAnimationFrame(async function update(timestamp) {
-          let sum1 = tracks[0].getByteFrequencyData().reduce((a,b) => a+b);
-          let sum2 = tracks[1].getByteFrequencyData().reduce((a,b) => a+b);
+        startBtn.addEventListener('click', async e => {
+          startBtn.remove();
+          spiralElement.style.setProperty('display', 'block');
 
-          lastSums1.push(sum1)
-          lastSums2.push(sum2)
-
-          let offset1 = (sum1 - Math.min(...lastSums1)) / Math.max(...lastSums1);
-          let offset2 = (sum2 - Math.min(...lastSums2)) / Math.max(...lastSums2) / 4;
-
-          if(offset2 > 0.15) {
-            scope.domElement.style.setProperty('transform', `translate3d(${random(0, window.innerWidth/3)}px, ${offset2*200 - 100}px, 0) scale(${random(1,3)})`)
+          if(Pizzicato.context.state == 'suspended') {
+            Pizzicato.context.resume()
           }
 
-          if(offset1 > 0.4) {
-            rearrangeGifs(gifElements)
-          }
+          tracks.map(t => t.play())
 
-          if(offset2 > 0.15) {
-            scope.domElement.style.setProperty('filter', `invert(${random([0, 1, 0])})`)
-            spiralElement.style.setProperty('filter', `invert(${random(0,1)})`)
-          }
+          const material = new Blotter.ChannelSplitMaterial();
+          const blotter = new Blotter(material, { texts : text });
 
-          if(navigator.getBattery) {
-            const batteryLevel = await navigator.getBattery();
-            batteryElement.innerText = `${parseInt(batteryLevel.level*100)}% battery`
-          }
+          const scope = blotter.forText(text)
+          scope.appendTo(containerElement);
 
-          material.uniforms.uRotation.value = offset1 * 360;
-          material.uniforms.uOffset.value = offset2 / 5;
+          const query = 'trippy';
+          const gifResults = await fetch(`${GIPHY_ROOT}${GIPHY_SEARCH_URI}?q=${query}&api_key=${GIPHY_API_KEY}`)
+            .then(resp => resp.json())
 
-          requestAnimationFrame(update);
+          const gifElements = gifResults.data.map(gif => {
+            let img = document.createElement('img');
+            img.src = gif.images.downsized.url;
+            img.classList.add('gif');
+            img.width = 100;
+            img.height = 100 * gif.images.downsized.height / gif.images.downsized.width;
+            img.style.setProperty('transform', `translate3d(${random(0, window.innerWidth)}px, ${random(0, window.innerHeight)}px, 0) scale(${random(1,2)})`)
+            img.style.setProperty('filter', `invert(${random([0, 1, 0])})`)
+            containerElement.appendChild(img);
+            return img;
+          })
+
+          let lastSums1 = [];
+          let lastSums2 = [];
+
+          requestAnimationFrame(async function update(timestamp) {
+
+            let sum1 = tracks[0].getByteFrequencyData().reduce((a,b) => a+b);
+            let sum2 = tracks[1].getByteFrequencyData().reduce((a,b) => a+b);
+
+            lastSums1.push(sum1)
+            lastSums2.push(sum2)
+
+            let offset1 = (sum1 - Math.min(...lastSums1)) / Math.max(...lastSums1);
+            let offset2 = (sum2 - Math.min(...lastSums2)) / Math.max(...lastSums2) / 4;
+
+            if(offset2 > 0.15) {
+              scope.domElement.style.setProperty('transform', `translate3d(${random(0, window.innerWidth/3)}px, ${offset2*200 - 100}px, 0) scale(${random(1,3)})`)
+            }
+
+            if(offset1 > 0.4) {
+              rearrangeGifs(gifElements)
+            }
+
+            if(offset2 > 0.15) {
+              scope.domElement.style.setProperty('filter', `invert(${random([0, 1, 0])})`)
+              spiralElement.style.setProperty('filter', `invert(${random(0,1)})`)
+            }
+
+            if(navigator.getBattery) {
+              const batteryLevel = await navigator.getBattery();
+              batteryElement.innerText = `${parseInt(batteryLevel.level*100)}% battery`
+            }
+
+            material.uniforms.uRotation.value = offset1 * 360;
+            material.uniforms.uOffset.value = offset2 / 5;
+
+            requestAnimationFrame(update);
+          })
         })
-      })()
+      }
     </script>
   </body>
 </html>
